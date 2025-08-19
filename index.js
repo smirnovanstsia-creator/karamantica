@@ -1,8 +1,8 @@
 const TelegramBot = require("node-telegram-bot-api");
 
 // --- Настройки ---
-const token = "8315344869:AAFWb0GC-XLB4ydWx3FfnHzk8-Y0zPoOBaI"; // Твой токен
-const adminId = 225867387; // Твой Telegram ID
+const token = "8315344869:AAFWb0GC-XLB4ydWx3FfnHzk8-Y0zPoOBaI"; // твой токен
+const adminId = 225867387; // твой Telegram ID
 const bot = new TelegramBot(token, { polling: true });
 
 // --- Дерево вопросов ---
@@ -68,52 +68,53 @@ const nodes = {
   },
 };
 
-// --- Старт команды ---
+// --- Генерация клавиатуры ---
+function makeKeyboard(nodeKey) {
+  const node = nodes[nodeKey];
+  return {
+    inline_keyboard: node.options.map((opt, idx) => [
+      { text: opt.text, callback_data: `${nodeKey}::${idx}` },
+    ]),
+  };
+}
+
+// --- Старт ---
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  const node = nodes.start;
-  bot.sendMessage(chatId, node.text, {
-    reply_markup: {
-      inline_keyboard: node.options.map((opt) => [
-        { text: opt.text, callback_data: opt.next },
-      ]),
-    },
+  bot.sendMessage(chatId, nodes.start.text, {
+    reply_markup: makeKeyboard("start"),
   });
 });
 
-// --- Обработка нажатий кнопок ---
+// --- Обработка кнопок ---
 bot.on("callback_query", (query) => {
   const chatId = query.message.chat.id;
-  const step = query.data;
-  const node = nodes[step];
-  if (!node) return;
+  const data = query.data.split("::");
+  const nodeKey = data[0];
+  const idx = parseInt(data[1], 10);
 
-  // Находим выбранный вариант у предыдущего узла
-  const prevNode = Object.values(nodes).find((n) =>
-    n.options.some((opt) => opt.next === step)
+  const node = nodes[nodeKey];
+  const choice = node.options[idx];
+  if (!choice) return;
+
+  const selectedText = choice.text;
+  const nextStep = choice.next;
+
+  // Удаляем старое сообщение
+  bot.deleteMessage(chatId, query.message.message_id).catch(() => {});
+
+  // Отправляем админу выбор
+  bot.sendMessage(
+    adminId,
+    `Ответ от ${chatId}: ${node.text} → ${selectedText}`
   );
-  let selectedText = step; // на случай, если не найдём
-  if (prevNode) {
-    const opt = prevNode.options.find((o) => o.next === step);
-    if (opt) selectedText = opt.text;
-  }
 
-  // Отправляем текст вопроса с кнопками
-  if (node.options.length > 0) {
-    bot.sendMessage(chatId, node.text, {
-      reply_markup: {
-        inline_keyboard: node.options.map((opt) => [
-          { text: opt.text, callback_data: opt.next },
-        ]),
-      },
+  // Отправляем следующий вопрос
+  if (nodes[nextStep]) {
+    bot.sendMessage(chatId, nodes[nextStep].text, {
+      reply_markup: nodes[nextStep].options.length
+        ? makeKeyboard(nextStep)
+        : undefined,
     });
-  } else {
-    bot.sendMessage(chatId, node.text);
   }
-
-  // Отправляем **выбранный вариант** админу
-  bot.sendMessage(adminId, `Ответ от ${chatId}: ${selectedText}`);
-
-  // Удаляем прошлое сообщение с кнопками
-  bot.deleteMessage(chatId, query.message.message_id);
 });
