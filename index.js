@@ -1,8 +1,8 @@
 const TelegramBot = require("node-telegram-bot-api");
 
 // --- Настройки ---
-const token = "8315344869:AAFWb0GC-XLB4ydWx3FfnHzk8-Y0zPoOBaI"; // твой токен
-const adminId = 225867387; // твой Telegram ID
+const token = "8315344869:AAFWb0GC-XLB4ydWx3FfnHzk8-Y0zPoOBaI"; // Твой токен
+const adminId = 225867387; // Твой Telegram ID
 const bot = new TelegramBot(token, { polling: true });
 
 // --- Дерево вопросов ---
@@ -34,10 +34,7 @@ const nodes = {
       { text: "Какую я поставлю, такую и будем слушать", next: "watch_choice" },
       { text: "Пусть Сая выберет сама", next: "watch_choice" },
       { text: "Романтическую в сторону Барри Уайта", next: "watch_choice" },
-      {
-        text: "Энергичную в сторону Блэк Айд Пис и Дулы Пип",
-        next: "watch_choice",
-      },
+      { text: "Энергичную в сторону Блэк Айд Пис и Дулы Пип", next: "watch_choice" },
       { text: "Ланку", next: "watch_choice" },
     ],
   },
@@ -68,12 +65,11 @@ const nodes = {
   },
 };
 
-// --- Генерация клавиатуры ---
+// --- Хелпер для клавиатуры ---
 function makeKeyboard(nodeKey) {
-  const node = nodes[nodeKey];
   return {
-    inline_keyboard: node.options.map((opt, idx) => [
-      { text: opt.text, callback_data: `${nodeKey}::${idx}` },
+    inline_keyboard: nodes[nodeKey].options.map((opt, i) => [
+      { text: opt.text, callback_data: `${nodeKey}::${i}` },
     ]),
   };
 }
@@ -81,7 +77,8 @@ function makeKeyboard(nodeKey) {
 // --- Старт ---
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, nodes.start.text, {
+  const node = nodes.start;
+  bot.sendMessage(chatId, node.text, {
     reply_markup: makeKeyboard("start"),
   });
 });
@@ -109,10 +106,11 @@ bot.on("callback_query", (query) => {
     `Ответ от ${chatId}: ${node.text} → ${selectedText}`
   );
 
-  // Отправляем следующий вопрос
+  // Отправляем следующий вопрос один раз
   if (nodes[nextStep]) {
-    bot.sendMessage(chatId, nodes[nextStep].text, {
-      reply_markup: nodes[nextStep].options.length
+    const nextNode = nodes[nextStep];
+    bot.sendMessage(chatId, nextNode.text, {
+      reply_markup: nextNode.options.length
         ? makeKeyboard(nextStep)
         : undefined,
     });
